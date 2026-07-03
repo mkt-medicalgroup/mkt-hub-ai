@@ -4,6 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import AuthGuard from '../../../components/AuthGuard';
 import FileDropzone from '../../../components/FileDropzone';
+import Timeline from '../../../components/Timeline';
+import ScoreBar from '../../../components/ScoreBar';
 import { supabase } from '../../../lib/supabaseClient';
 
 const ARTICLE_TYPES = [
@@ -20,6 +22,12 @@ const LENGTHS = [
   { label: 'Medio (~1200 parole)', value: 1200 },
   { label: 'Lungo (~2000 parole)', value: 2000 },
   { label: 'Pillar page (~3000+ parole)', value: 3000 },
+];
+
+const STEPS = [
+  { label: 'Brand voice' },
+  { label: 'Contenuti & fonti' },
+  { label: 'Anteprima articolo' },
 ];
 
 export default function ArticleToolPage() {
@@ -43,14 +51,16 @@ function ArticleTool() {
   const [articleType, setArticleType] = useState(ARTICLE_TYPES[0]);
   const [length, setLength] = useState(LENGTHS[1].value);
 
+  // Step 3
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [result, setResult] = useState('');
+  const [result, setResult] = useState(null); // { metaTitle, metaDescription, article, scores, notes }
 
   async function handleGenerate() {
     setError('');
     setLoading(true);
-    setResult('');
+    setResult(null);
+    setStep(3);
 
     try {
       const res = await fetch('/api/generate-article', {
@@ -68,7 +78,7 @@ function ArticleTool() {
 
       if (!res.ok) throw new Error('generation-failed');
       const data = await res.json();
-      setResult(data.article);
+      setResult(data);
 
       // Salva il progetto nello storico (facoltativo ma utile)
       const { data: userData } = await supabase.auth.getUser();
@@ -80,6 +90,8 @@ function ArticleTool() {
         competitor_url: competitorUrl,
         notes,
         result: data.article,
+        scores: data.scores,
+        ai_notes: data.notes,
       });
     } catch (e) {
       setError('Generazione non riuscita. Controlla la chiave API Gemini e riprova.');
@@ -108,12 +120,7 @@ function ArticleTool() {
           Genera articoli sempre in ottica SEO e GEO, coerenti con il brand.
         </p>
 
-        {/* Stepper */}
-        <div className="flex items-center gap-3 mb-8 font-mono text-xs uppercase tracking-wide">
-          <StepPill active={step === 1} done={step > 1} label="1 · brand" onClick={() => setStep(1)} />
-          <span className="text-border">—</span>
-          <StepPill active={step === 2} done={false} label="2 · articolo" onClick={() => setStep(2)} />
-        </div>
+        <Timeline steps={STEPS} current={step} onStepClick={setStep} />
 
         {step === 1 && (
           <section className="space-y-6">
@@ -234,40 +241,112 @@ function ArticleTool() {
                 disabled={loading || !keyword}
                 className="bg-accent hover:bg-accent/90 disabled:opacity-50 text-bg font-semibold rounded-lg px-5 py-2.5 transition-colors"
               >
-                {loading ? 'Generazione in corso...' : 'Genera articolo'}
+                {loading ? 'Generazione in corso...' : 'Genera articolo →'}
               </button>
             </div>
+          </section>
+        )}
 
-            {error && <p className="text-accent text-sm font-mono">{error}</p>}
-
-            {result && (
-              <div className="bg-surface border border-border rounded-2xl p-6">
-                <h2 className="font-display font-semibold mb-4">Risultato</h2>
-                <article className="prose prose-invert prose-sm max-w-none whitespace-pre-wrap text-ink">
-                  {result}
-                </article>
+        {step === 3 && (
+          <section className="space-y-6">
+            {loading && (
+              <div className="bg-surface border border-border rounded-2xl p-10 flex flex-col items-center justify-center text-center">
+                <div className="w-8 h-8 border-2 border-border border-t-accent rounded-full animate-spin mb-4" />
+                <p className="font-mono text-sm text-muted">ottimizzazione SEO / GEO in corso...</p>
               </div>
+            )}
+
+            {!loading && error && (
+              <div className="bg-surface border border-border rounded-2xl p-6">
+                <p className="text-accent text-sm font-mono">{error}</p>
+                <button
+                  onClick={() => setStep(2)}
+                  className="mt-4 border border-border hover:border-muted text-ink rounded-lg px-5 py-2.5 transition-colors"
+                >
+                  ← Torna indietro e riprova
+                </button>
+              </div>
+            )}
+
+            {!loading && result && (
+              <>
+                {/* Punteggi semaforici */}
+                <div className="bg-surface border border-border rounded-2xl p-6">
+                  <h2 className="font-display font-semibold mb-5">Qualità dell'articolo</h2>
+                  <div className="grid gap-5 sm:grid-cols-3">
+                    <ScoreBar label="Autenticità" value={result.scores?.originality} />
+                    <ScoreBar label="Livello SEO" value={result.scores?.seo} />
+                    <ScoreBar label="Livello GEO" value={result.scores?.geo} />
+                  </div>
+                </div>
+
+                {/* Articolo */}
+                <div className="bg-surface border border-border rounded-2xl p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-display font-semibold">Articolo</h2>
+                    <button
+                      onClick={() => navigator.clipboard.writeText(result.article)}
+                      className="font-mono text-xs text-muted hover:text-ink border border-border rounded-lg px-3 py-1.5 transition-colors"
+                    >
+                      copia testo
+                    </button>
+                  </div>
+
+                  {result.metaTitle && (
+                    <div className="mb-4 pb-4 border-b border-border">
+                      <p className="font-mono text-[10px] text-muted uppercase tracking-wide mb-1">
+                        Meta title
+                      </p>
+                      <p className="text-sm mb-3">{result.metaTitle}</p>
+                      <p className="font-mono text-[10px] text-muted uppercase tracking-wide mb-1">
+                        Meta description
+                      </p>
+                      <p className="text-sm text-muted">{result.metaDescription}</p>
+                    </div>
+                  )}
+
+                  <article className="prose prose-invert prose-sm max-w-none whitespace-pre-wrap text-ink">
+                    {result.article}
+                  </article>
+                </div>
+
+                {/* Note e suggerimenti dell'AI */}
+                {result.notes?.length > 0 && (
+                  <div className="bg-surface border border-border rounded-2xl p-6">
+                    <h2 className="font-display font-semibold mb-4">Note &amp; suggerimenti</h2>
+                    <div className="space-y-3">
+                      {result.notes.map((n, i) => (
+                        <div
+                          key={i}
+                          className="flex items-start gap-3 bg-bg border border-border rounded-lg px-4 py-3"
+                        >
+                          <span className="text-accent font-mono text-xs mt-0.5">•</span>
+                          <p className="text-sm text-ink/90">{n}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => setStep(2)}
+                    className="border border-border hover:border-muted text-ink rounded-lg px-5 py-2.5 transition-colors"
+                  >
+                    ← Modifica input
+                  </button>
+                  <button
+                    onClick={handleGenerate}
+                    className="bg-accent hover:bg-accent/90 text-bg font-semibold rounded-lg px-5 py-2.5 transition-colors"
+                  >
+                    Rigenera
+                  </button>
+                </div>
+              </>
             )}
           </section>
         )}
       </main>
     </div>
-  );
-}
-
-function StepPill({ active, done, label, onClick }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`px-3 py-1.5 rounded-full border transition-colors ${
-        active
-          ? 'border-accent text-accent'
-          : done
-          ? 'border-online text-online'
-          : 'border-border text-muted'
-      }`}
-    >
-      {label}
-    </button>
   );
 }
