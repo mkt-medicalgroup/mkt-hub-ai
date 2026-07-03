@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 // Questa route gira sul server (mai nel browser), quindi GEMINI_API_KEY
 // resta segreta. Va impostata come variabile d'ambiente su Vercel.
-const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_MODEL = 'gemini-flash-latest';
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
 export async function POST(request) {
