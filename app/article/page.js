@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import AuthGuard from '../../../components/AuthGuard';
-import FileDropzone from '../../../components/FileDropzone';
-import Timeline from '../../../components/Timeline';
-import ScoreBar from '../../../components/ScoreBar';
-import { supabase } from '../../../lib/supabaseClient';
+import AuthGuard from '../../components/AuthGuard';
+import FileDropzone from '../../components/FileDropzone';
+import Timeline from '../../components/Timeline';
+import ScoreBar from '../../components/ScoreBar';
+import { supabase } from '../../lib/supabaseClient';
 
 const ARTICLE_TYPES = [
   'Informativo',
