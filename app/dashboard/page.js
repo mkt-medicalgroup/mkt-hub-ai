@@ -18,9 +18,10 @@ const TOOLS = [
   },
   {
     title: 'Social Post',
-    description: 'Caroselli, copy e hook per i social a partire dal tono di voce del brand.',
-    status: 'coming-soon',
-    href: null,
+    description:
+      'Ogni giorno propone 5 idee di post per sede, basate su tendenze sanitarie e ricerche del sito. Genera anche l\'immagine coerente col brand.',
+    status: 'online',
+    href: '/tools/social-post',
   },
   {
     title: 'Newsletter',
