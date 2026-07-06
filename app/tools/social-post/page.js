@@ -248,7 +248,7 @@ function SocialPostTool() {
                   disabled={!locationId}
                   className="bg-accent hover:bg-accent/90 disabled:opacity-50 text-bg font-semibold rounded-lg px-5 py-2.5 transition-colors"
                 >
-                  Genera 5 proposte ora
+                  Genera 3 proposte ora
                 </button>
                 {genError && <p className="text-accent text-sm font-mono mt-3">{genError}</p>}
               </div>
