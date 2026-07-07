@@ -369,6 +369,28 @@ function ArticleTool() {
                   </div>
                 )}
 
+                <div className="bg-surface border border-border rounded-2xl card-shadow p-6 flex items-center justify-between flex-wrap gap-3">
+                  <div>
+                    <p className="font-display font-semibold">Salva nella libreria</p>
+                    <p className="text-muted text-sm">
+                      Ogni articolo generato resta comunque disponibile per la sessione corrente,
+                      ma solo quelli con il flag attivo compaiono in "I miei articoli".
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleToggleApproved}
+                    disabled={saveState === 'saving'}
+                    className={`shrink-0 flex items-center gap-2 rounded-lg px-4 py-2.5 font-semibold transition-colors ${
+                      approved
+                        ? 'bg-accent text-onAccent hover:bg-accent/90'
+                        : 'border border-border text-ink hover:border-muted'
+                    }`}
+                  >
+                    <span>{approved ? '★' : '☆'}</span>
+                    {saveState === 'saving' ? 'Salvataggio...' : approved ? 'Salvato in libreria' : 'Salva nella libreria'}
+                  </button>
+                </div>
+
                 <div className="flex items-center gap-3">
                   <button
                     onClick={() => setStep(2)}
@@ -382,6 +404,12 @@ function ArticleTool() {
                   >
                     Rigenera
                   </button>
+                  <Link
+                    href="/library/articles"
+                    className="ml-auto font-mono text-xs text-muted hover:text-ink border border-border rounded-lg px-3 py-2 transition-colors"
+                  >
+                    vai a "I miei articoli" →
+                  </Link>
                 </div>
               </>
             )}
