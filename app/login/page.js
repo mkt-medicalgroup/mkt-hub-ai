@@ -41,7 +41,7 @@ export default function LoginPage() {
           </span>
         </div>
 
-        <div className="bg-surface border border-border rounded-2xl p-8">
+        <div className="bg-surface border border-border rounded-2xl card-shadow p-8">
           <h1 className="font-display text-2xl font-semibold mb-1">Accedi all'hub</h1>
           <p className="text-muted text-sm mb-6">
             Marketing &amp; comunicazione, in un unico posto.
@@ -83,7 +83,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-accent hover:bg-accent/90 disabled:opacity-50 text-bg font-semibold rounded-lg py-2.5 transition-colors"
+              className="w-full bg-accent hover:bg-accent/90 disabled:opacity-50 text-onAccent font-semibold rounded-lg py-2.5 transition-colors"
             >
               {loading ? 'Accesso...' : 'Entra'}
             </button>
