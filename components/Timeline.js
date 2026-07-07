@@ -19,7 +19,7 @@ export default function Timeline({ steps, current, onStepClick }) {
               <span
                 className={`w-9 h-9 rounded-full flex items-center justify-center font-mono text-sm font-medium border-2 transition-colors ${
                   isDone
-                    ? 'bg-online border-online text-bg'
+                    ? 'bg-online border-online text-onAccent'
                     : isCurrent
                     ? 'border-accent text-accent'
                     : 'border-border text-muted'
