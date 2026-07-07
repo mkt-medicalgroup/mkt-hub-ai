@@ -7,7 +7,7 @@ export default function ToolCard({ title, description, status, href, index }) {
 
   const content = (
     <div
-      className={`group relative bg-surface border border-border rounded-2xl p-6 h-full flex flex-col justify-between transition-colors ${
+      className={`group relative bg-surface border border-border rounded-2xl card-shadow p-6 h-full flex flex-col justify-between transition-colors ${
         isOnline ? 'hover:border-accent cursor-pointer' : 'opacity-60'
       }`}
     >
