@@ -7,16 +7,17 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        bg: '#10121A',
-        surface: '#1A1D29',
-        surfaceHover: '#20232F',
-        border: '#2B2F3D',
-        ink: '#EDEEF3',
-        muted: '#8C90A4',
-        accent: '#FF6A3D',
-        accentSoft: 'rgba(255,106,61,0.12)',
-        online: '#4ADE80',
-        pending: '#565B6E',
+        bg: '#FAFAF7',
+        surface: '#FFFFFF',
+        surfaceHover: '#F3F5EE',
+        border: '#E2E6D9',
+        ink: '#2A2E2C',
+        muted: '#737A7B',
+        accent: '#AACF38',
+        accentSoft: '#D5E3B7',
+        onAccent: '#20241C',
+        online: '#7CB342',
+        pending: '#C7CCC6',
       },
       fontFamily: {
         display: ['"Space Grotesk"', 'sans-serif'],
