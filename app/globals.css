@@ -5,8 +5,8 @@
 @tailwind utilities;
 
 html, body {
-  background: #10121A;
-  color: #EDEEF3;
+  background: #FAFAF7;
+  color: #2A2E2C;
   font-family: 'Inter', sans-serif;
 }
 
@@ -15,7 +15,7 @@ html, body {
 }
 
 ::selection {
-  background: rgba(255, 106, 61, 0.35);
+  background: rgba(170, 207, 56, 0.35);
 }
 
 .led {
@@ -26,18 +26,22 @@ html, body {
 }
 
 .led-online {
-  background: #4ADE80;
-  box-shadow: 0 0 8px rgba(74, 222, 128, 0.7);
+  background: #7CB342;
+  box-shadow: 0 0 8px rgba(124, 179, 66, 0.5);
 }
 
 .led-pending {
-  background: #565B6E;
+  background: #C7CCC6;
 }
 
 .scrollbar-thin::-webkit-scrollbar {
   width: 6px;
 }
 .scrollbar-thin::-webkit-scrollbar-thumb {
-  background: #2B2F3D;
+  background: #E2E6D9;
   border-radius: 999px;
+}
+
+.card-shadow {
+  box-shadow: 0 1px 2px rgba(42, 46, 44, 0.04), 0 4px 16px rgba(42, 46, 44, 0.05);
 }
