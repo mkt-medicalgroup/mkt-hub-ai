@@ -6,6 +6,7 @@ import AuthGuard from '../../../components/AuthGuard';
 import FileDropzone from '../../../components/FileDropzone';
 import Timeline from '../../../components/Timeline';
 import ScoreBar from '../../../components/ScoreBar';
+import GenerationProgress from '../../../components/GenerationProgress';
 import { supabase } from '../../../lib/supabaseClient';
 
 const ARTICLE_TYPES = [
@@ -55,11 +56,29 @@ function ArticleTool() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null); // { metaTitle, metaDescription, article, scores, notes }
+  const [savedId, setSavedId] = useState(null);
+  const [approved, setApproved] = useState(false);
+  const [saveState, setSaveState] = useState('idle'); // idle | saving | saved
+
+  const progressMessages = [
+    brandFiles.length
+      ? `Analizzo ${brandFiles.length} document${brandFiles.length > 1 ? 'i' : 'o'} del brand caricat${brandFiles.length > 1 ? 'i' : 'o'}...`
+      : 'Applico un tono di voce neutro (nessun documento brand caricato)...',
+    competitorUrl
+      ? 'Studio la struttura dell\'articolo del competitor indicato...'
+      : 'Nessun competitor indicato: costruisco la struttura da zero...',
+    `Cerco i contenuti migliori già online per "${keyword || 'la keyword indicata'}"...`,
+    `Scrivo l'articolo in formato ${articleType.toLowerCase()}, ottimizzato SEO e GEO...`,
+    'Calcolo i punteggi di autenticità, SEO e GEO...',
+  ];
 
   async function handleGenerate() {
     setError('');
     setLoading(true);
     setResult(null);
+    setSavedId(null);
+    setApproved(false);
+    setSaveState('idle');
     setStep(3);
 
     try {
@@ -80,19 +99,27 @@ function ArticleTool() {
       const data = await res.json();
       setResult(data);
 
-      // Salva il progetto nello storico (facoltativo ma utile)
+      // Salva subito ogni generazione (non approvata di default), così non si
+      // perde nulla anche se l'utente non la segna come "buona".
       const { data: userData } = await supabase.auth.getUser();
-      await supabase.from('article_projects').insert({
-        user_id: userData?.user?.id,
-        keyword,
-        article_type: articleType,
-        length,
-        competitor_url: competitorUrl,
-        notes,
-        result: data.article,
-        scores: data.scores,
-        ai_notes: data.notes,
-      });
+      const { data: inserted } = await supabase
+        .from('article_projects')
+        .insert({
+          user_id: userData?.user?.id,
+          keyword,
+          article_type: articleType,
+          length,
+          competitor_url: competitorUrl,
+          notes,
+          result: data.article,
+          scores: data.scores,
+          ai_notes: data.notes,
+          approved: false,
+        })
+        .select()
+        .single();
+
+      if (inserted) setSavedId(inserted.id);
     } catch (e) {
       setError('Generazione non riuscita. Controlla la chiave API Gemini e riprova.');
     } finally {
@@ -100,13 +127,32 @@ function ArticleTool() {
     }
   }
 
+  async function handleToggleApproved() {
+    if (!savedId) return;
+    setSaveState('saving');
+    const nextApproved = !approved;
+    try {
+      await supabase.from('article_projects').update({ approved: nextApproved }).eq('id', savedId);
+      setApproved(nextApproved);
+      setSaveState('saved');
+      setTimeout(() => setSaveState('idle'), 1500);
+    } catch (e) {
+      setSaveState('idle');
+    }
+  }
+
   return (
     <div className="min-h-screen bg-bg">
       <header className="border-b border-border">
         <div className="max-w-4xl mx-auto px-6 py-5 flex items-center justify-between">
-          <Link href="/dashboard" className="font-mono text-xs text-muted hover:text-ink">
-            ← hub
-          </Link>
+          <div className="flex items-center gap-5">
+            <Link href="/dashboard" className="font-mono text-xs text-muted hover:text-ink">
+              ← hub
+            </Link>
+            <Link href="/tools/article/archive" className="font-mono text-xs text-muted hover:text-ink">
+              📁 i miei articoli
+            </Link>
+          </div>
           <span className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide">
             <span className="led led-online" />
             <span className="text-online">modulo article</span>
@@ -124,7 +170,7 @@ function ArticleTool() {
 
         {step === 1 && (
           <section className="space-y-6">
-            <div className="bg-surface border border-border rounded-2xl p-6">
+            <div className="bg-surface border border-border rounded-2xl card-shadow p-6">
               <h2 className="font-display font-semibold mb-1">Documenti del brand</h2>
               <p className="text-muted text-sm mb-4">
                 Tono di voce, brand manual, guideline: tutto ciò che serve per scrivere come il brand.
@@ -136,7 +182,7 @@ function ArticleTool() {
               />
             </div>
 
-            <div className="bg-surface border border-border rounded-2xl p-6">
+            <div className="bg-surface border border-border rounded-2xl card-shadow p-6">
               <h2 className="font-display font-semibold mb-1">Note</h2>
               <p className="text-muted text-sm mb-4">
                 Accorgimenti specifici su cosa deve contenere l'articolo.
@@ -152,7 +198,7 @@ function ArticleTool() {
 
             <button
               onClick={() => setStep(2)}
-              className="bg-accent hover:bg-accent/90 text-bg font-semibold rounded-lg px-5 py-2.5 transition-colors"
+              className="bg-accent hover:bg-accent/90 text-onAccent font-semibold rounded-lg px-5 py-2.5 transition-colors"
             >
               Continua →
             </button>
@@ -161,7 +207,7 @@ function ArticleTool() {
 
         {step === 2 && (
           <section className="space-y-6">
-            <div className="bg-surface border border-border rounded-2xl p-6">
+            <div className="bg-surface border border-border rounded-2xl card-shadow p-6">
               <h2 className="font-display font-semibold mb-1">Competitor di riferimento</h2>
               <p className="text-muted text-sm mb-4">
                 URL di un articolo a cui ispirarsi per struttura e livello di approfondimento.
@@ -175,7 +221,7 @@ function ArticleTool() {
               />
             </div>
 
-            <div className="bg-surface border border-border rounded-2xl p-6 grid gap-5 sm:grid-cols-2">
+            <div className="bg-surface border border-border rounded-2xl card-shadow p-6 grid gap-5 sm:grid-cols-2">
               <div className="sm:col-span-2">
                 <label className="block text-xs font-mono text-muted mb-1.5 uppercase tracking-wide">
                   Keyword principale
@@ -239,7 +285,7 @@ function ArticleTool() {
               <button
                 onClick={handleGenerate}
                 disabled={loading || !keyword}
-                className="bg-accent hover:bg-accent/90 disabled:opacity-50 text-bg font-semibold rounded-lg px-5 py-2.5 transition-colors"
+                className="bg-accent hover:bg-accent/90 disabled:opacity-50 text-onAccent font-semibold rounded-lg px-5 py-2.5 transition-colors"
               >
                 {loading ? 'Generazione in corso...' : 'Genera articolo →'}
               </button>
@@ -249,15 +295,10 @@ function ArticleTool() {
 
         {step === 3 && (
           <section className="space-y-6">
-            {loading && (
-              <div className="bg-surface border border-border rounded-2xl p-10 flex flex-col items-center justify-center text-center">
-                <div className="w-8 h-8 border-2 border-border border-t-accent rounded-full animate-spin mb-4" />
-                <p className="font-mono text-sm text-muted">ottimizzazione SEO / GEO in corso...</p>
-              </div>
-            )}
+            {loading && <GenerationProgress messages={progressMessages} />}
 
             {!loading && error && (
-              <div className="bg-surface border border-border rounded-2xl p-6">
+              <div className="bg-surface border border-border rounded-2xl card-shadow p-6">
                 <p className="text-accent text-sm font-mono">{error}</p>
                 <button
                   onClick={() => setStep(2)}
@@ -271,7 +312,7 @@ function ArticleTool() {
             {!loading && result && (
               <>
                 {/* Punteggi semaforici */}
-                <div className="bg-surface border border-border rounded-2xl p-6">
+                <div className="bg-surface border border-border rounded-2xl card-shadow p-6">
                   <h2 className="font-display font-semibold mb-5">Qualità dell'articolo</h2>
                   <div className="grid gap-5 sm:grid-cols-3">
                     <ScoreBar label="Autenticità" value={result.scores?.originality} />
@@ -281,7 +322,7 @@ function ArticleTool() {
                 </div>
 
                 {/* Articolo */}
-                <div className="bg-surface border border-border rounded-2xl p-6">
+                <div className="bg-surface border border-border rounded-2xl card-shadow p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h2 className="font-display font-semibold">Articolo</h2>
                     <button
@@ -312,7 +353,7 @@ function ArticleTool() {
 
                 {/* Note e suggerimenti dell'AI */}
                 {result.notes?.length > 0 && (
-                  <div className="bg-surface border border-border rounded-2xl p-6">
+                  <div className="bg-surface border border-border rounded-2xl card-shadow p-6">
                     <h2 className="font-display font-semibold mb-4">Note &amp; suggerimenti</h2>
                     <div className="space-y-3">
                       {result.notes.map((n, i) => (
@@ -337,7 +378,7 @@ function ArticleTool() {
                   </button>
                   <button
                     onClick={handleGenerate}
-                    className="bg-accent hover:bg-accent/90 text-bg font-semibold rounded-lg px-5 py-2.5 transition-colors"
+                    className="bg-accent hover:bg-accent/90 text-onAccent font-semibold rounded-lg px-5 py-2.5 transition-colors"
                   >
                     Rigenera
                   </button>
