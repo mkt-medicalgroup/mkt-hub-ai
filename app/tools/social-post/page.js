@@ -5,9 +5,27 @@ import Link from 'next/link';
 import AuthGuard from '../../../components/AuthGuard';
 import Timeline from '../../../components/Timeline';
 import FileDropzone from '../../../components/FileDropzone';
+import GenerationProgress from '../../../components/GenerationProgress';
 import { supabase } from '../../../lib/supabaseClient';
 
 const STEPS = [{ label: 'Proposte' }, { label: 'Immagine' }, { label: 'Anteprima' }];
+
+const PROPOSAL_PROGRESS_MESSAGES = [
+  'Ricerca degli argomenti sanitari più discussi oggi...',
+  'Analisi di articoli scientifici e fonti di settore...',
+  'Lettura delle query di ricerca del sito per questa sede...',
+  'Confronto tra gli argomenti trovati e la specializzazione della sede...',
+  'Scrittura di hook e caption per ciascuna proposta...',
+  'Selezione delle 5 idee più rilevanti...',
+];
+
+const IMAGE_PROGRESS_MESSAGES = [
+  'Lettura delle linee guida visive del brand...',
+  'Applicazione di palette colori e stile fotografico richiesti...',
+  'Composizione della scena in base all\'argomento del post...',
+  'Generazione dell\'immagine con Gemini...',
+  'Rifinitura dei dettagli finali...',
+];
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -231,14 +249,11 @@ function SocialPostTool() {
         {step === 1 && (
           <section className="space-y-4">
             {loadingProposals && (
-              <div className="bg-surface border border-border rounded-2xl p-10 flex flex-col items-center justify-center text-center">
-                <div className="w-8 h-8 border-2 border-border border-t-accent rounded-full animate-spin mb-4" />
-                <p className="font-mono text-sm text-muted">ricerca argomenti in corso...</p>
-              </div>
+              <GenerationProgress messages={PROPOSAL_PROGRESS_MESSAGES} />
             )}
 
             {!loadingProposals && proposals.length === 0 && (
-              <div className="bg-surface border border-border rounded-2xl p-8 text-center">
+              <div className="bg-surface border border-border rounded-2xl card-shadow p-8 text-center">
                 <p className="text-muted text-sm mb-4">
                   Nessuna proposta ancora per oggi per questa sede. Il modulo genera da solo
                   ogni giorno, oppure puoi generarla subito ora.
@@ -246,9 +261,9 @@ function SocialPostTool() {
                 <button
                   onClick={handleGenerateProposals}
                   disabled={!locationId}
-                  className="bg-accent hover:bg-accent/90 disabled:opacity-50 text-bg font-semibold rounded-lg px-5 py-2.5 transition-colors"
+                  className="bg-accent hover:bg-accent/90 disabled:opacity-50 text-onAccent font-semibold rounded-lg px-5 py-2.5 transition-colors"
                 >
-                  Genera 3 proposte ora
+                  Genera 5 proposte ora
                 </button>
                 {genError && <p className="text-accent text-sm font-mono mt-3">{genError}</p>}
               </div>
@@ -265,7 +280,7 @@ function SocialPostTool() {
                   </button>
                 </div>
                 {proposals.map((p) => (
-                  <div key={p.id} className="bg-surface border border-border rounded-2xl p-6">
+                  <div key={p.id} className="bg-surface border border-border rounded-2xl card-shadow p-6">
                     <div className="flex items-start justify-between gap-4">
                       <div>
                         <p className="font-mono text-[10px] text-muted uppercase tracking-wide mb-1">
@@ -277,7 +292,7 @@ function SocialPostTool() {
                       </div>
                       <button
                         onClick={() => openVisualStep(p)}
-                        className="shrink-0 bg-accent hover:bg-accent/90 text-bg font-semibold rounded-lg px-4 py-2 transition-colors"
+                        className="shrink-0 bg-accent hover:bg-accent/90 text-onAccent font-semibold rounded-lg px-4 py-2 transition-colors"
                       >
                         Visual →
                       </button>
@@ -291,14 +306,14 @@ function SocialPostTool() {
 
         {step === 2 && selectedProposal && (
           <section className="space-y-6">
-            <div className="bg-surface border border-border rounded-2xl p-6">
+            <div className="bg-surface border border-border rounded-2xl card-shadow p-6">
               <p className="font-mono text-[10px] text-muted uppercase tracking-wide mb-1">
                 post selezionato
               </p>
               <h3 className="font-display font-semibold">{selectedProposal.hook}</h3>
             </div>
 
-            <div className="bg-surface border border-border rounded-2xl p-6">
+            <div className="bg-surface border border-border rounded-2xl card-shadow p-6">
               <div className="flex items-center justify-between mb-1">
                 <h2 className="font-display font-semibold">Linee guida visive del brand</h2>
                 <button
@@ -327,7 +342,7 @@ function SocialPostTool() {
               <FileDropzone bucket="brand-assets" pathPrefix="visual-guidelines" onFilesChange={() => {}} />
             </div>
 
-            <div className="bg-surface border border-border rounded-2xl p-6">
+            <div className="bg-surface border border-border rounded-2xl card-shadow p-6">
               <h2 className="font-display font-semibold mb-1">Note per questa immagine</h2>
               <p className="text-muted text-sm mb-4">Facoltative, valgono solo per questo post.</p>
               <textarea
@@ -349,7 +364,7 @@ function SocialPostTool() {
               <button
                 onClick={handleGenerateImage}
                 disabled={imageLoading}
-                className="bg-accent hover:bg-accent/90 disabled:opacity-50 text-bg font-semibold rounded-lg px-5 py-2.5 transition-colors"
+                className="bg-accent hover:bg-accent/90 disabled:opacity-50 text-onAccent font-semibold rounded-lg px-5 py-2.5 transition-colors"
               >
                 {imageLoading ? 'Generazione in corso...' : 'Genera immagine →'}
               </button>
@@ -361,16 +376,13 @@ function SocialPostTool() {
         {step === 3 && selectedProposal && (
           <section className="space-y-6">
             {imageLoading && (
-              <div className="bg-surface border border-border rounded-2xl p-10 flex flex-col items-center justify-center text-center">
-                <div className="w-8 h-8 border-2 border-border border-t-accent rounded-full animate-spin mb-4" />
-                <p className="font-mono text-sm text-muted">generazione immagine in corso...</p>
-              </div>
+              <GenerationProgress messages={IMAGE_PROGRESS_MESSAGES} />
             )}
 
             {!imageLoading && imageBase64 && (
               <>
                 {/* Anteprima stile IG */}
-                <div className="bg-surface border border-border rounded-2xl overflow-hidden max-w-sm mx-auto">
+                <div className="bg-surface border border-border rounded-2xl card-shadow overflow-hidden max-w-sm mx-auto">
                   <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
                     <span className="w-7 h-7 rounded-full bg-accent" />
                     <span className="text-sm font-medium">
@@ -413,7 +425,7 @@ function SocialPostTool() {
                   </button>
                   <button
                     onClick={handleSavePost}
-                    className="bg-accent hover:bg-accent/90 text-bg font-semibold rounded-lg px-5 py-2.5 transition-colors"
+                    className="bg-accent hover:bg-accent/90 text-onAccent font-semibold rounded-lg px-5 py-2.5 transition-colors"
                   >
                     Salva post
                   </button>
@@ -459,7 +471,7 @@ function LocationPanel({ locations, locationId, onAddLocation }) {
   }
 
   return (
-    <div className="bg-surface border border-border rounded-2xl p-6 mb-6 space-y-6">
+    <div className="bg-surface border border-border rounded-2xl card-shadow p-6 mb-6 space-y-6">
       <div>
         <h3 className="font-display font-semibold mb-3">Aggiungi una sede</h3>
         <div className="grid gap-3 sm:grid-cols-3">
@@ -489,7 +501,7 @@ function LocationPanel({ locations, locationId, onAddLocation }) {
             setCity('');
             setSpecialization('');
           }}
-          className="mt-3 text-sm bg-accent hover:bg-accent/90 text-bg font-semibold rounded-lg px-4 py-2 transition-colors"
+          className="mt-3 text-sm bg-accent hover:bg-accent/90 text-onAccent font-semibold rounded-lg px-4 py-2 transition-colors"
         >
           Aggiungi sede
         </button>
