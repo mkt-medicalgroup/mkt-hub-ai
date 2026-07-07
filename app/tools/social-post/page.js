@@ -433,6 +433,14 @@ function SocialPostTool() {
                 {savedMessage && (
                   <p className="text-center text-online text-xs font-mono">{savedMessage}</p>
                 )}
+                <div className="text-center">
+                  <Link
+                    href="/library/social-posts"
+                    className="font-mono text-xs text-muted hover:text-ink border border-border rounded-lg px-3 py-2 transition-colors"
+                  >
+                    vai a "I miei post" →
+                  </Link>
+                </div>
               </>
             )}
           </section>
