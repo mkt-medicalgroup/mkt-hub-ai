@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import AuthGuard from '../../components/AuthGuard';
 import ToolCard from '../../components/ToolCard';
 import { supabase } from '../../lib/supabaseClient';
@@ -96,6 +97,27 @@ function DashboardContent() {
             <span className="font-mono text-2xl mb-2">+</span>
             <span className="text-sm">Il prossimo modulo va qui</span>
           </div>
+        </div>
+
+        <h2 className="font-display text-xl font-semibold mt-14 mb-2">La tua libreria</h2>
+        <p className="text-muted mb-6 max-w-xl">
+          Solo i contenuti che hai salvato esplicitamente restano archiviati qui.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <Link
+            href="/library/articles"
+            className="bg-surface border border-border rounded-2xl card-shadow p-6 hover:border-accent transition-colors"
+          >
+            <h3 className="font-display font-semibold mb-1">I miei articoli</h3>
+            <p className="text-muted text-sm">Gli articoli salvati dal modulo Article.</p>
+          </Link>
+          <Link
+            href="/library/social-posts"
+            className="bg-surface border border-border rounded-2xl card-shadow p-6 hover:border-accent transition-colors"
+          >
+            <h3 className="font-display font-semibold mb-1">I miei post</h3>
+            <p className="text-muted text-sm">I post salvati dal modulo Social Post.</p>
+          </Link>
         </div>
       </main>
     </div>
