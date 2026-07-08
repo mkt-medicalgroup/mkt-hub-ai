@@ -149,7 +149,7 @@ function ArticleTool() {
             <Link href="/dashboard" className="font-mono text-xs text-muted hover:text-ink">
               ← hub
             </Link>
-            <Link href="/tools/article/archive" className="font-mono text-xs text-muted hover:text-ink">
+            <Link href="/library/articles" className="font-mono text-xs text-muted hover:text-ink">
               📁 i miei articoli
             </Link>
           </div>
