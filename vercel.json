@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/gsc/daily-sync",
+      "schedule": "30 5 * * *"
+    },
+    {
       "path": "/api/social/daily-cron",
       "schedule": "0 6 * * *"
     }
