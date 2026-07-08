@@ -112,6 +112,22 @@ function SocialPostTool() {
     }
   }
 
+  async function handleUpdateLocation(id, fields) {
+    const { data } = await supabase.from('locations').update(fields).eq('id', id).select().single();
+    if (data) {
+      setLocations((prev) => prev.map((l) => (l.id === id ? data : l)));
+    }
+  }
+
+  async function handleDeleteLocation(id) {
+    await supabase.from('locations').delete().eq('id', id);
+    setLocations((prev) => {
+      const next = prev.filter((l) => l.id !== id);
+      if (locationId === id) setLocationId(next[0]?.id || '');
+      return next;
+    });
+  }
+
   async function handleGenerateProposals() {
     setGenError('');
     setLoadingProposals(true);
@@ -243,6 +259,8 @@ function SocialPostTool() {
             locations={locations}
             locationId={locationId}
             onAddLocation={handleAddLocation}
+            onUpdateLocation={handleUpdateLocation}
+            onDeleteLocation={handleDeleteLocation}
           />
         )}
 
@@ -450,16 +468,28 @@ function SocialPostTool() {
   );
 }
 
-function LocationPanel({ locations, locationId, onAddLocation }) {
+function LocationPanel({ locations, locationId, onAddLocation, onUpdateLocation, onDeleteLocation }) {
   const [name, setName] = useState('');
   const [city, setCity] = useState('');
   const [specialization, setSpecialization] = useState('');
   const [query, setQuery] = useState('');
   const [queries, setQueries] = useState([]);
+  const [editingId, setEditingId] = useState(null);
+  const [editDraft, setEditDraft] = useState({});
+  const [gscStatus, setGscStatus] = useState({ connected: false });
+  const [syncMessage, setSyncMessage] = useState('');
+  const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
     if (locationId) loadQueries();
   }, [locationId]);
+
+  useEffect(() => {
+    fetch('/api/gsc/status')
+      .then((r) => r.json())
+      .then(setGscStatus)
+      .catch(() => {});
+  }, []);
 
   async function loadQueries() {
     const { data } = await supabase
@@ -467,21 +497,187 @@ function LocationPanel({ locations, locationId, onAddLocation }) {
       .select('*')
       .eq('location_id', locationId)
       .order('created_at', { ascending: false })
-      .limit(20);
+      .limit(30);
     setQueries(data || []);
   }
 
   async function addQuery() {
     if (!query.trim()) return;
-    await supabase.from('site_queries').insert({ location_id: locationId, query: query.trim() });
+    await supabase
+      .from('site_queries')
+      .insert({ location_id: locationId, query: query.trim(), source: 'manual' });
     setQuery('');
     loadQueries();
   }
 
+  async function removeQuery(id) {
+    await supabase.from('site_queries').delete().eq('id', id);
+    setQueries((prev) => prev.filter((q) => q.id !== id));
+  }
+
+  function startEdit(loc) {
+    setEditingId(loc.id);
+    setEditDraft({
+      name: loc.name || '',
+      city: loc.city || '',
+      specialization: loc.specialization || '',
+      gsc_site_url: loc.gsc_site_url || '',
+    });
+  }
+
+  async function saveEdit(id) {
+    await onUpdateLocation(id, editDraft);
+    setEditingId(null);
+  }
+
+  async function handleSyncNow(locId) {
+    setSyncing(true);
+    setSyncMessage('');
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+      const res = await fetch('/api/gsc/sync-now', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ locationId: locId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'errore');
+      setSyncMessage(`Sincronizzate ${data.synced ?? 0} query da Search Console ✓`);
+      if (locId === locationId) loadQueries();
+    } catch (e) {
+      setSyncMessage(`Errore: ${String(e.message || e)}`);
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  const currentLocation = locations.find((l) => l.id === locationId);
+
   return (
     <div className="bg-surface border border-border rounded-2xl card-shadow p-6 mb-6 space-y-6">
+      {/* Google Search Console */}
+      <div className="flex items-center justify-between flex-wrap gap-3 pb-6 border-b border-border">
+        <div>
+          <h3 className="font-display font-semibold mb-1">Google Search Console</h3>
+          <p className="text-muted text-sm">
+            {gscStatus.connected
+              ? 'Collegato — le query di ogni sede con un URL di proprietà impostato si aggiornano da sole ogni giorno.'
+              : 'Non ancora collegato: le query vanno inserite a mano finché non lo colleghi.'}
+          </p>
+        </div>
+        {gscStatus.connected ? (
+          <span className="font-mono text-xs text-online border border-border rounded-lg px-3 py-1.5">
+            ✓ connesso
+          </span>
+        ) : (
+          <a
+            href="/api/gsc/auth"
+            className="bg-accent hover:bg-accent/90 text-onAccent font-semibold rounded-lg px-4 py-2 transition-colors text-sm"
+          >
+            Collega Search Console
+          </a>
+        )}
+      </div>
+
+      {/* Elenco sedi con modifica/elimina */}
       <div>
-        <h3 className="font-display font-semibold mb-3">Aggiungi una sede</h3>
+        <h3 className="font-display font-semibold mb-3">Le tue sedi</h3>
+        <div className="space-y-2 mb-4">
+          {locations.map((loc) => {
+            const isEditing = editingId === loc.id;
+            return (
+              <div key={loc.id} className="border border-border rounded-lg p-3">
+                {isEditing ? (
+                  <div className="space-y-2">
+                    <div className="grid gap-2 sm:grid-cols-3">
+                      <input
+                        value={editDraft.name}
+                        onChange={(e) => setEditDraft((d) => ({ ...d, name: e.target.value }))}
+                        placeholder="Nome sede"
+                        className="bg-bg border border-border rounded-lg px-3 py-2 text-ink outline-none focus:border-accent"
+                      />
+                      <input
+                        value={editDraft.city}
+                        onChange={(e) => setEditDraft((d) => ({ ...d, city: e.target.value }))}
+                        placeholder="Città"
+                        className="bg-bg border border-border rounded-lg px-3 py-2 text-ink outline-none focus:border-accent"
+                      />
+                      <input
+                        value={editDraft.specialization}
+                        onChange={(e) => setEditDraft((d) => ({ ...d, specialization: e.target.value }))}
+                        placeholder="Specializzazione"
+                        className="bg-bg border border-border rounded-lg px-3 py-2 text-ink outline-none focus:border-accent"
+                      />
+                    </div>
+                    <input
+                      value={editDraft.gsc_site_url}
+                      onChange={(e) => setEditDraft((d) => ({ ...d, gsc_site_url: e.target.value }))}
+                      placeholder="URL proprietà Search Console (es. https://www.tuosito.it/ oppure sc-domain:tuosito.it)"
+                      className="w-full bg-bg border border-border rounded-lg px-3 py-2 text-ink outline-none focus:border-accent font-mono text-sm"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => saveEdit(loc.id)}
+                        className="text-sm bg-accent hover:bg-accent/90 text-onAccent font-semibold rounded-lg px-4 py-1.5 transition-colors"
+                      >
+                        Salva
+                      </button>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="text-sm border border-border hover:border-muted rounded-lg px-4 py-1.5 transition-colors"
+                      >
+                        Annulla
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <div>
+                      <p className="font-medium">
+                        {loc.name}
+                        {loc.city ? ` · ${loc.city}` : ''}
+                      </p>
+                      <p className="text-muted text-xs font-mono">
+                        {loc.gsc_site_url ? `GSC: ${loc.gsc_site_url}` : 'nessuna proprietà GSC impostata'}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {gscStatus.connected && loc.gsc_site_url && (
+                        <button
+                          onClick={() => handleSyncNow(loc.id)}
+                          disabled={syncing}
+                          className="text-xs font-mono border border-border hover:border-muted rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+                        >
+                          {syncing ? 'sincronizzo...' : 'sincronizza ora'}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => startEdit(loc)}
+                        className="text-xs font-mono text-muted hover:text-ink border border-border rounded-lg px-3 py-1.5 transition-colors"
+                      >
+                        modifica
+                      </button>
+                      <button
+                        onClick={() => {
+                          if (confirm(`Eliminare la sede "${loc.name}"? Verranno eliminate anche le sue proposte e i suoi post salvati.`)) {
+                            onDeleteLocation(loc.id);
+                          }
+                        }}
+                        className="text-xs font-mono text-muted hover:text-accent border border-border rounded-lg px-3 py-1.5 transition-colors"
+                      >
+                        elimina
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        {syncMessage && <p className="text-xs font-mono text-muted mb-4">{syncMessage}</p>}
+
+        <h4 className="font-display font-semibold mb-3 text-sm">Aggiungi una nuova sede</h4>
         <div className="grid gap-3 sm:grid-cols-3">
           <input
             value={name}
@@ -516,11 +712,14 @@ function LocationPanel({ locations, locationId, onAddLocation }) {
       </div>
 
       {locationId && (
-        <div>
-          <h3 className="font-display font-semibold mb-1">Query di ricerca del sito</h3>
+        <div className="pt-6 border-t border-border">
+          <h3 className="font-display font-semibold mb-1">
+            Query di ricerca del sito {currentLocation ? `— ${currentLocation.name}` : ''}
+          </h3>
           <p className="text-muted text-sm mb-3">
-            Incolla qui le query più cercate dagli utenti (es. da Google Search Console) per
-            questa sede: verranno usate per orientare gli argomenti dei post.
+            {gscStatus.connected && currentLocation?.gsc_site_url
+              ? 'Aggiornate automaticamente da Search Console ogni giorno. Puoi comunque aggiungerne a mano.'
+              : 'Incolla qui le query più cercate dagli utenti per questa sede: verranno usate per orientare gli argomenti dei post.'}
           </p>
           <div className="flex gap-2 mb-3">
             <input
@@ -542,9 +741,17 @@ function LocationPanel({ locations, locationId, onAddLocation }) {
               {queries.map((q) => (
                 <span
                   key={q.id}
-                  className="text-xs font-mono bg-bg border border-border rounded-full px-3 py-1"
+                  className="group flex items-center gap-1.5 text-xs font-mono bg-bg border border-border rounded-full pl-3 pr-1.5 py-1"
                 >
+                  {q.source === 'gsc' && <span className="text-accent">●</span>}
                   {q.query}
+                  <button
+                    onClick={() => removeQuery(q.id)}
+                    className="text-muted hover:text-accent opacity-60 group-hover:opacity-100 px-1"
+                    title="rimuovi"
+                  >
+                    ×
+                  </button>
                 </span>
               ))}
             </div>
