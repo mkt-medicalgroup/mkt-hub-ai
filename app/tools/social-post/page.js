@@ -16,15 +16,14 @@ const PROPOSAL_PROGRESS_MESSAGES = [
   'Lettura delle query di ricerca del sito per questa sede...',
   'Confronto tra gli argomenti trovati e la specializzazione della sede...',
   'Scrittura di hook e caption per ciascuna proposta...',
-  'Selezione delle 5 idee più rilevanti...',
+  'Selezione delle 3 idee più rilevanti...',
 ];
 
 const IMAGE_PROGRESS_MESSAGES = [
   'Lettura delle linee guida visive del brand...',
-  'Applicazione di palette colori e stile fotografico richiesti...',
-  'Composizione della scena in base all\'argomento del post...',
-  'Generazione dell\'immagine con Gemini...',
-  'Rifinitura dei dettagli finali...',
+  'Traduzione dell\'argomento in parole chiave di ricerca...',
+  'Ricerca di foto pertinenti su Pexels...',
+  'Selezione delle immagini più adatte...',
 ];
 
 function todayISO() {
@@ -53,10 +52,9 @@ function SocialPostTool() {
   const [selectedProposal, setSelectedProposal] = useState(null);
 
   const [visualGuideline, setVisualGuideline] = useState('');
-  const [extraNotes, setExtraNotes] = useState('');
   const [imageLoading, setImageLoading] = useState(false);
-  const [imageBase64, setImageBase64] = useState('');
-  const [imageMime, setImageMime] = useState('image/png');
+  const [photoOptions, setPhotoOptions] = useState([]);
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [imageError, setImageError] = useState('');
   const [savedMessage, setSavedMessage] = useState('');
 
@@ -152,55 +150,51 @@ function SocialPostTool() {
 
   function openVisualStep(proposal) {
     setSelectedProposal(proposal);
-    setImageBase64('');
+    setPhotoOptions([]);
+    setSelectedPhoto(null);
     setImageError('');
     setStep(2);
   }
 
-  async function handleGenerateImage() {
+  async function handleSearchImages() {
     setImageError('');
     setImageLoading(true);
-    setImageBase64('');
+    setPhotoOptions([]);
+    setSelectedPhoto(null);
     try {
-      const res = await fetch('/api/social/generate-image', {
+      const res = await fetch('/api/social/search-images', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           topic: selectedProposal.topic,
           hook: selectedProposal.hook,
-          caption: selectedProposal.caption,
           visualGuideline,
-          extraNotes,
         }),
       });
 
-      if (!res.ok) throw new Error('image-generation-failed');
+      if (!res.ok) throw new Error('image-search-failed');
       const data = await res.json();
-      setImageBase64(data.imageBase64);
-      setImageMime(data.mimeType || 'image/png');
-      setStep(3);
+      setPhotoOptions(data.photos || []);
     } catch (e) {
-      setImageError('Generazione immagine non riuscita. Controlla la chiave API Gemini.');
+      setImageError('Ricerca immagini non riuscita. Controlla le chiavi API Gemini e Pexels.');
     } finally {
       setImageLoading(false);
     }
   }
 
+  function choosePhoto(photo) {
+    setSelectedPhoto(photo);
+    setStep(3);
+  }
+
   async function handleSavePost() {
     setSavedMessage('Salvataggio in corso...');
     try {
-      const byteChars = atob(imageBase64);
-      const byteNumbers = new Array(byteChars.length);
-      for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
-      const blob = new Blob([new Uint8Array(byteNumbers)], { type: imageMime });
-
-      const path = `${locationId}/${Date.now()}.png`;
-      await supabase.storage.from('social-assets').upload(path, blob, { contentType: imageMime });
-
       await supabase.from('social_posts').insert({
         proposal_id: selectedProposal.id,
         location_id: locationId,
-        image_path: path,
+        image_path: selectedPhoto.large,
+        image_credit: `Foto di ${selectedPhoto.photographer} su Pexels`,
         final_caption: `${selectedProposal.caption}\n\n${selectedProposal.hashtags}`,
       });
 
@@ -281,7 +275,7 @@ function SocialPostTool() {
                   disabled={!locationId}
                   className="bg-accent hover:bg-accent/90 disabled:opacity-50 text-onAccent font-semibold rounded-lg px-5 py-2.5 transition-colors"
                 >
-                  Genera 5 proposte ora
+                  Genera 3 proposte ora
                 </button>
                 {genError && <p className="text-accent text-sm font-mono mt-3">{genError}</p>}
               </div>
@@ -342,14 +336,14 @@ function SocialPostTool() {
                 </button>
               </div>
               <p className="text-muted text-sm mb-4">
-                Colori, font, stile fotografico, cosa evitare — vengono applicate a ogni
-                immagine generata. Vale per tutte le sedi.
+                Colori, stile fotografico, cosa evitare — vengono usate per orientare la ricerca
+                delle foto su Pexels. Vale per tutte le sedi.
               </p>
               <textarea
                 value={visualGuideline}
                 onChange={(e) => setVisualGuideline(e.target.value)}
                 rows={6}
-                placeholder="Es: palette blu #0A4F9C e bianco, font sans-serif arrotondato, fotografia luminosa e naturale, mai camici bianchi in primo piano, logo non necessario nell'immagine..."
+                placeholder="Es: fotografia luminosa e naturale, mai camici bianchi in primo piano, preferire mani/gesti quotidiani o ambienti caldi..."
                 className="w-full bg-bg border border-border rounded-lg px-3 py-2.5 text-ink outline-none focus:border-accent transition-colors resize-none"
               />
               {savedMessage && <p className="text-online text-xs font-mono mt-2">{savedMessage}</p>}
@@ -360,18 +354,6 @@ function SocialPostTool() {
               <FileDropzone bucket="brand-assets" pathPrefix="visual-guidelines" onFilesChange={() => {}} />
             </div>
 
-            <div className="bg-surface border border-border rounded-2xl card-shadow p-6">
-              <h2 className="font-display font-semibold mb-1">Note per questa immagine</h2>
-              <p className="text-muted text-sm mb-4">Facoltative, valgono solo per questo post.</p>
-              <textarea
-                value={extraNotes}
-                onChange={(e) => setExtraNotes(e.target.value)}
-                rows={3}
-                placeholder="Es: includi un elemento che richiami l'autunno, evita persone in primo piano..."
-                className="w-full bg-bg border border-border rounded-lg px-3 py-2.5 text-ink outline-none focus:border-accent transition-colors resize-none"
-              />
-            </div>
-
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setStep(1)}
@@ -380,87 +362,112 @@ function SocialPostTool() {
                 ← Indietro
               </button>
               <button
-                onClick={handleGenerateImage}
+                onClick={handleSearchImages}
                 disabled={imageLoading}
                 className="bg-accent hover:bg-accent/90 disabled:opacity-50 text-onAccent font-semibold rounded-lg px-5 py-2.5 transition-colors"
               >
-                {imageLoading ? 'Generazione in corso...' : 'Genera immagine →'}
+                {imageLoading ? 'Ricerca in corso...' : 'Cerca foto su Pexels →'}
               </button>
             </div>
             {imageError && <p className="text-accent text-sm font-mono">{imageError}</p>}
+
+            {imageLoading && <GenerationProgress messages={IMAGE_PROGRESS_MESSAGES} />}
+
+            {!imageLoading && photoOptions.length > 0 && (
+              <div className="bg-surface border border-border rounded-2xl card-shadow p-6">
+                <h2 className="font-display font-semibold mb-1">Scegli una foto</h2>
+                <p className="text-muted text-sm mb-4">
+                  Clicca quella più adatta: passerai subito all'anteprima del post.
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  {photoOptions.map((photo) => (
+                    <button
+                      key={photo.id}
+                      onClick={() => choosePhoto(photo)}
+                      className="group relative rounded-xl overflow-hidden border border-border hover:border-accent transition-colors aspect-square"
+                    >
+                      <img src={photo.thumb} alt={photo.alt} className="w-full h-full object-cover" />
+                      <span className="absolute inset-x-0 bottom-0 bg-black/50 text-white text-[10px] px-2 py-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {photo.photographer}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         )}
 
-        {step === 3 && selectedProposal && (
+        {step === 3 && selectedProposal && selectedPhoto && (
           <section className="space-y-6">
-            {imageLoading && (
-              <GenerationProgress messages={IMAGE_PROGRESS_MESSAGES} />
-            )}
+            <>
+              {/* Anteprima stile IG */}
+              <div className="bg-surface border border-border rounded-2xl card-shadow overflow-hidden max-w-sm mx-auto">
+                <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
+                  <span className="w-7 h-7 rounded-full bg-accent" />
+                  <span className="text-sm font-medium">
+                    {locations.find((l) => l.id === locationId)?.name}
+                  </span>
+                </div>
+                <img
+                  src={selectedPhoto.large}
+                  alt={selectedProposal.topic}
+                  className="w-full aspect-square object-cover"
+                />
+                <div className="p-4">
+                  <p className="text-sm whitespace-pre-wrap mb-2">{selectedProposal.caption}</p>
+                  <p className="text-xs text-accent font-mono mb-2">{selectedProposal.hashtags}</p>
+                  <p className="text-[11px] text-muted">
+                    Foto di{' '}
+                    <a
+                      href={selectedPhoto.photographerUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="underline hover:text-ink"
+                    >
+                      {selectedPhoto.photographer}
+                    </a>{' '}
+                    su Pexels
+                  </p>
+                </div>
+              </div>
 
-            {!imageLoading && imageBase64 && (
-              <>
-                {/* Anteprima stile IG */}
-                <div className="bg-surface border border-border rounded-2xl card-shadow overflow-hidden max-w-sm mx-auto">
-                  <div className="flex items-center gap-2 px-4 py-3 border-b border-border">
-                    <span className="w-7 h-7 rounded-full bg-accent" />
-                    <span className="text-sm font-medium">
-                      {locations.find((l) => l.id === locationId)?.name}
-                    </span>
-                  </div>
-                  <img
-                    src={`data:${imageMime};base64,${imageBase64}`}
-                    alt={selectedProposal.topic}
-                    className="w-full aspect-square object-cover"
-                  />
-                  <div className="p-4">
-                    <p className="text-sm whitespace-pre-wrap mb-2">{selectedProposal.caption}</p>
-                    <p className="text-xs text-accent font-mono">{selectedProposal.hashtags}</p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-center gap-3">
-                  <button
-                    onClick={() => setStep(2)}
-                    className="border border-border hover:border-muted text-ink rounded-lg px-5 py-2.5 transition-colors"
-                  >
-                    ← Modifica
-                  </button>
-                  <button
-                    onClick={handleGenerateImage}
-                    className="border border-border hover:border-muted text-ink rounded-lg px-5 py-2.5 transition-colors"
-                  >
-                    Rigenera immagine
-                  </button>
-                  <button
-                    onClick={() =>
-                      navigator.clipboard.writeText(
-                        `${selectedProposal.caption}\n\n${selectedProposal.hashtags}`
-                      )
-                    }
-                    className="border border-border hover:border-muted text-ink rounded-lg px-5 py-2.5 transition-colors"
-                  >
-                    Copia caption
-                  </button>
-                  <button
-                    onClick={handleSavePost}
-                    className="bg-accent hover:bg-accent/90 text-onAccent font-semibold rounded-lg px-5 py-2.5 transition-colors"
-                  >
-                    Salva post
-                  </button>
-                </div>
-                {savedMessage && (
-                  <p className="text-center text-online text-xs font-mono">{savedMessage}</p>
-                )}
-                <div className="text-center">
-                  <Link
-                    href="/library/social-posts"
-                    className="font-mono text-xs text-muted hover:text-ink border border-border rounded-lg px-3 py-2 transition-colors"
-                  >
-                    vai a "I miei post" →
-                  </Link>
-                </div>
-              </>
-            )}
+              <div className="flex items-center justify-center gap-3 flex-wrap">
+                <button
+                  onClick={() => setStep(2)}
+                  className="border border-border hover:border-muted text-ink rounded-lg px-5 py-2.5 transition-colors"
+                >
+                  ← Cambia foto
+                </button>
+                <button
+                  onClick={() =>
+                    navigator.clipboard.writeText(
+                      `${selectedProposal.caption}\n\n${selectedProposal.hashtags}`
+                    )
+                  }
+                  className="border border-border hover:border-muted text-ink rounded-lg px-5 py-2.5 transition-colors"
+                >
+                  Copia caption
+                </button>
+                <button
+                  onClick={handleSavePost}
+                  className="bg-accent hover:bg-accent/90 text-onAccent font-semibold rounded-lg px-5 py-2.5 transition-colors"
+                >
+                  Salva post
+                </button>
+              </div>
+              {savedMessage && (
+                <p className="text-center text-online text-xs font-mono">{savedMessage}</p>
+              )}
+              <div className="text-center">
+                <Link
+                  href="/library/social-posts"
+                  className="font-mono text-xs text-muted hover:text-ink border border-border rounded-lg px-3 py-2 transition-colors"
+                >
+                  vai a "I miei post" →
+                </Link>
+              </div>
+            </>
           </section>
         )}
       </main>
