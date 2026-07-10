@@ -11,7 +11,7 @@ import { supabase } from '../../../lib/supabaseClient';
 const STEPS = [{ label: 'Proposte' }, { label: 'Immagine' }, { label: 'Anteprima' }];
 
 const PROPOSAL_PROGRESS_MESSAGES = [
-  'Ricerca degli argomenti sanitari più discussi oggi...',
+  'Selezione di argomenti sanitari rilevanti per la sede...',
   'Analisi di articoli scientifici e fonti di settore...',
   'Lettura delle query di ricerca del sito per questa sede...',
   'Confronto tra gli argomenti trovati e la specializzazione della sede...',
@@ -20,8 +20,6 @@ const PROPOSAL_PROGRESS_MESSAGES = [
 ];
 
 const IMAGE_PROGRESS_MESSAGES = [
-  'Lettura delle linee guida visive del brand...',
-  'Traduzione dell\'argomento in parole chiave di ricerca...',
   'Ricerca di foto pertinenti su Pexels...',
   'Selezione delle immagini più adatte...',
 ];
@@ -168,7 +166,6 @@ function SocialPostTool() {
         body: JSON.stringify({
           topic: selectedProposal.topic,
           hook: selectedProposal.hook,
-          visualGuideline,
         }),
       });
 
@@ -176,7 +173,7 @@ function SocialPostTool() {
       const data = await res.json();
       setPhotoOptions(data.photos || []);
     } catch (e) {
-      setImageError('Ricerca immagini non riuscita. Controlla le chiavi API Gemini e Pexels.');
+      setImageError('Ricerca immagini non riuscita. Controlla la chiave API Pexels.');
     } finally {
       setImageLoading(false);
     }
@@ -222,7 +219,7 @@ function SocialPostTool() {
       <main className="max-w-4xl mx-auto px-6 py-10">
         <h1 className="font-display text-2xl font-semibold mb-1">Social Post</h1>
         <p className="text-muted text-sm mb-8">
-          Argomenti di tendenza in ambito sanitario, per sede, pronti da trasformare in post.
+          Idee di post sanitari per sede, basate sulle query di ricerca del tuo sito, pronte da trasformare in contenuti.
         </p>
 
         <Timeline steps={STEPS} current={step} onStepClick={setStep} />
@@ -336,8 +333,8 @@ function SocialPostTool() {
                 </button>
               </div>
               <p className="text-muted text-sm mb-4">
-                Colori, stile fotografico, cosa evitare — vengono usate per orientare la ricerca
-                delle foto su Pexels. Vale per tutte le sedi.
+                Colori, stile fotografico, cosa evitare — tienile a portata di mano come
+                riferimento quando scegli la foto tra i risultati di Pexels. Vale per tutte le sedi.
               </p>
               <textarea
                 value={visualGuideline}
