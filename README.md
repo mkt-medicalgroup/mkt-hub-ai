@@ -129,6 +129,110 @@ Apri [http://localhost:3000](http://localhost:3000).
 
 ---
 
+## Libreria "I miei articoli" / "I miei post"
+
+Se avevi già configurato l'hub prima di questa funzione, esegui in Supabase → SQL
+Editor il file `supabase/migration-003-library-flag.sql` (non tocca nulla di
+esistente). Aggiunge solo il flag che permette di salvare esplicitamente un
+articolo in "I miei articoli" — i post sono già filtrati di default, dato che
+finiscono in libreria solo quando premi "Salva post".
+
+---
+
+## Google Search Console automatico
+
+Se avevi già configurato l'hub prima di questa funzione: esegui in Supabase →
+SQL Editor il file `supabase/migration-004-gsc-integration.sql` (non tocca
+nulla di esistente).
+
+Questo collegamento permette al modulo Social Post di prendere da solo, ogni
+giorno, le query di ricerca reali del tuo sito da Google Search Console,
+senza doverle incollare a mano. Il collegamento (fatto una volta sola) vale
+per tutto l'hub; ogni sede sceglie poi a quale proprietà GSC riferirsi.
+
+**Setup (circa 10 minuti, una tantum):**
+
+1. Vai su [Google Cloud Console](https://console.cloud.google.com/) → crea un
+   progetto nuovo (o usane uno esistente).
+2. **APIs & Services → Library** → cerca "Search Console API" → **Enable**.
+3. **APIs & Services → OAuth consent screen**: tipo "External" (o "Internal" se
+   usi Google Workspace), nome app a piacere, la tua email come contatto.
+   Non serve pubblicarla, va bene anche in modalità "Testing" — in quel caso
+   aggiungi la tua email in **Test users**.
+4. **APIs & Services → Credentials → Create Credentials → OAuth client ID** →
+   tipo "Web application".
+   - **Authorized redirect URIs**: aggiungi `https://TUO-DOMINIO.vercel.app/api/gsc/callback`
+     (sostituisci con il tuo dominio Vercel reale).
+5. Copia **Client ID** e **Client Secret**.
+6. Vercel → Settings → Environment Variables: aggiungi `GOOGLE_CLIENT_ID` e
+   `GOOGLE_CLIENT_SECRET` con quei valori → Redeploy.
+7. Apri l'hub → Social Post → "gestisci sedi & query" → **"Collega Search
+   Console"**: ti porta sulla schermata di consenso Google, autorizza con
+   l'account che ha accesso alla Search Console del tuo sito.
+8. Per ogni sede, clicca "modifica" e compila **URL proprietà Search Console**
+   esattamente come appare nel menu a tendina in alto a sinistra su
+   [search.google.com/search-console](https://search.google.com/search-console)
+   (es. `https://www.tuosito.it/` oppure, per le proprietà a dominio,
+   `sc-domain:tuosito.it`).
+9. Solo le sedi con questo campo compilato si sincronizzano — le altre restano
+   manuali finché non lo imposti anche per loro. Puoi anche premere
+   "sincronizza ora" per testarlo subito, senza aspettare il cron notturno.
+
+**Nota**: se in futuro ricolleghi l'account e non ricevi un nuovo
+collegamento valido, vai su
+[myaccount.google.com/permissions](https://myaccount.google.com/permissions),
+rimuovi l'accesso alla tua app e ripeti il collegamento da capo.
+
+---
+
+## Foto da Pexels invece che generate con AI
+
+Dal modulo Social Post, le immagini non vengono più generate dall'AI: vengono
+cercate su [Pexels](https://www.pexels.com) (banca di foto stock gratuita),
+scegliendo tra alcune proposte quella più adatta. Gemini traduce l'argomento
+del post in una query di ricerca efficace in inglese, tenendo conto delle
+linee guida visive del brand. Le proposte giornaliere sono inoltre passate da
+5 a 3.
+
+Se avevi già configurato l'hub prima di questa funzione:
+
+1. Vai su [pexels.com/api](https://www.pexels.com/api/) → crea un account
+   gratuito → copia la tua API key (gratuita, nessun limite di scadenza).
+2. Vercel → Settings → Environment Variables → aggiungi `PEXELS_API_KEY` →
+   Redeploy.
+3. Supabase → SQL Editor → esegui `supabase/migration-005-pexels-images.sql`
+   (non tocca nulla di esistente).
+4. Sostituisci nel repo GitHub: `app/tools/social-post/page.js`,
+   `lib/socialProposals.js`, `app/dashboard/page.js`.
+5. Aggiungi (nuovi): `lib/pexels.js`, `app/api/social/search-images/route.js`.
+6. **Rimuovi** la vecchia cartella `app/api/social/generate-image/` (non serve
+   più — se la lasci non causa danni, ma è codice morto).
+
+Nota: l'attribuzione al fotografo viene mostrata automaticamente sotto ogni
+immagine, come richiesto dalle condizioni d'uso di Pexels — non va rimossa.
+
+**Aggiornamento**: la ricerca delle foto ora usa direttamente l'argomento/keyword
+della proposta come query di ricerca su Pexels, senza passare da una chiamata
+Gemini intermedia — così ogni post consuma solo la quota gratuita della
+generazione testo (proposte), non di più. Se avevi già configurato questo
+modulo, sostituisci `app/api/social/search-images/route.js` e
+`app/tools/social-post/page.js` con le versioni aggiornate.
+
+---
+
+## Proposte social senza costi di fatturazione
+
+Le proposte giornaliere del modulo Social Post non usano più la ricerca web
+in tempo reale di Gemini (quella funzione, chiamata "grounding", richiede la
+fatturazione attiva sulla chiave API anche per pochi utilizzi). Ora Gemini
+si basa sulla sua conoscenza generale di argomenti sanitari ricorrenti e,
+soprattutto, sulle query di ricerca reali del sito (manuali o da Search
+Console) — che restano la bussola più concreta per capire cosa interessa
+davvero alle persone. Nessuna configurazione aggiuntiva richiesta: basta
+sostituire `lib/socialProposals.js` con la versione aggiornata.
+
+---
+
 ## MODULO 02 — Social Post: setup
 
 Se hai già completato lo Step 1-5 sopra **prima** che esistesse questo modulo, segui
