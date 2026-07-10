@@ -20,7 +20,7 @@ const TOOLS = [
   {
     title: 'Social Post',
     description:
-      'Ogni giorno propone 3 idee di post per sede, basate su tendenze sanitarie e ricerche del sito. Trova anche una foto Pexels coerente col brand.',
+      'Ogni giorno propone 3 idee di post per sede, basate su argomenti sanitari ricorrenti e sulle ricerche reali del sito. Trova anche una foto Pexels coerente col brand.',
     status: 'online',
     href: '/tools/social-post',
   },
