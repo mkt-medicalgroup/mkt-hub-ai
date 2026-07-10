@@ -38,7 +38,11 @@ function SocialPostsLibrary() {
 
     const urls = {};
     for (const p of data || []) {
-      if (p.image_path) {
+      if (!p.image_path) continue;
+      if (p.image_path.startsWith('http')) {
+        // Foto Pexels: è già un URL pubblico, nessun bisogno di firmarlo.
+        urls[p.id] = p.image_path;
+      } else {
         const { data: signed } = await supabase.storage
           .from('social-assets')
           .createSignedUrl(p.image_path, 3600);
@@ -102,7 +106,10 @@ function SocialPostsLibrary() {
                 <p className="font-mono text-[10px] text-muted uppercase tracking-wide mb-2">
                   {locations[p.location_id] || 'Sede'} · {new Date(p.created_at).toLocaleDateString('it-IT')}
                 </p>
-                <p className="text-sm whitespace-pre-wrap mb-3">{p.final_caption}</p>
+                <p className="text-sm whitespace-pre-wrap mb-2">{p.final_caption}</p>
+                {p.image_credit && (
+                  <p className="text-[11px] text-muted mb-3">{p.image_credit}</p>
+                )}
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => navigator.clipboard.writeText(p.final_caption)}
