@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AuthGuard from '../../../components/AuthGuard';
 import FileDropzone from '../../../components/FileDropzone';
@@ -46,6 +46,11 @@ function ArticleTool() {
   const [brandFiles, setBrandFiles] = useState([]);
   const [notes, setNotes] = useState('');
 
+  // Proposte automatiche di argomenti (basate sulle query di ricerca del sito)
+  const [topicSuggestions, setTopicSuggestions] = useState([]);
+  const [loadingTopics, setLoadingTopics] = useState(false);
+  const [topicsError, setTopicsError] = useState('');
+
   // Step 2
   const [competitorUrl, setCompetitorUrl] = useState('');
   const [keyword, setKeyword] = useState('');
@@ -71,6 +76,43 @@ function ArticleTool() {
     `Scrivo l'articolo in formato ${articleType.toLowerCase()}, ottimizzato SEO e GEO...`,
     'Calcolo i punteggi di autenticità, SEO e GEO...',
   ];
+
+  async function handleSuggestTopics() {
+    setTopicsError('');
+    setLoadingTopics(true);
+    setTopicSuggestions([]);
+    try {
+      const { data: queries } = await supabase
+        .from('site_queries')
+        .select('query')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      const uniqueQueries = [...new Set((queries || []).map((q) => q.query))];
+
+      const res = await fetch('/api/article/suggest-topics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ siteQueries: uniqueQueries, notes }),
+      });
+
+      if (!res.ok) throw new Error('suggest-topics-failed');
+      const data = await res.json();
+      setTopicSuggestions(data.topics || []);
+    } catch (e) {
+      setTopicsError('Suggerimento non riuscito. Controlla la chiave API Gemini e riprova.');
+    } finally {
+      setLoadingTopics(false);
+    }
+  }
+
+  function applySuggestion(topic) {
+    setKeyword(topic.keyword || topic.topic);
+    if (ARTICLE_TYPES.includes(topic.articleType)) {
+      setArticleType(topic.articleType);
+    }
+    setStep(2);
+  }
 
   async function handleGenerate() {
     setError('');
@@ -196,11 +238,58 @@ function ArticleTool() {
               />
             </div>
 
+            <div className="bg-surface border border-border rounded-2xl card-shadow p-6">
+              <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
+                <h2 className="font-display font-semibold">Argomenti suggeriti</h2>
+                <button
+                  onClick={handleSuggestTopics}
+                  disabled={loadingTopics}
+                  className="text-xs font-mono text-muted hover:text-ink border border-border rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+                >
+                  {loadingTopics ? 'suggerisco...' : topicSuggestions.length ? 'rigenera' : 'suggerisci 3 argomenti'}
+                </button>
+              </div>
+              <p className="text-muted text-sm mb-4">
+                Basati sulle query di ricerca reali del tuo sito (le stesse del modulo Social
+                Post). Se non ti convincono, ignora pure e scegli tu keyword e URL nello Step 2.
+              </p>
+
+              {loadingTopics && (
+                <p className="font-mono text-xs text-muted">analisi delle query in corso...</p>
+              )}
+              {topicsError && <p className="text-accent text-sm font-mono">{topicsError}</p>}
+
+              {!loadingTopics && topicSuggestions.length > 0 && (
+                <div className="space-y-3">
+                  {topicSuggestions.map((t, i) => (
+                    <div
+                      key={i}
+                      className="border border-border rounded-lg p-4 flex items-start justify-between gap-3 flex-wrap"
+                    >
+                      <div>
+                        <p className="font-medium mb-1">{t.topic}</p>
+                        <p className="text-muted text-xs mb-1">
+                          keyword: <span className="font-mono">{t.keyword}</span> · {t.articleType}
+                        </p>
+                        {t.rationale && <p className="text-muted text-xs">{t.rationale}</p>}
+                      </div>
+                      <button
+                        onClick={() => applySuggestion(t)}
+                        className="shrink-0 bg-accent hover:bg-accent/90 text-onAccent text-sm font-semibold rounded-lg px-4 py-2 transition-colors"
+                      >
+                        Usa questo →
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             <button
               onClick={() => setStep(2)}
               className="bg-accent hover:bg-accent/90 text-onAccent font-semibold rounded-lg px-5 py-2.5 transition-colors"
             >
-              Continua →
+              Continua manualmente →
             </button>
           </section>
         )}
