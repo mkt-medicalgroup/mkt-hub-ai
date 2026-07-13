@@ -47,9 +47,22 @@ function ArticleTool() {
   const [notes, setNotes] = useState('');
 
   // Proposte automatiche di argomenti (basate sulle query di ricerca del sito)
+  const [locations, setLocations] = useState([]);
+  const [suggestLocationId, setSuggestLocationId] = useState('');
   const [topicSuggestions, setTopicSuggestions] = useState([]);
   const [loadingTopics, setLoadingTopics] = useState(false);
   const [topicsError, setTopicsError] = useState('');
+
+  useEffect(() => {
+    supabase
+      .from('locations')
+      .select('id, name')
+      .order('created_at')
+      .then(({ data }) => {
+        setLocations(data || []);
+        if (data?.length) setSuggestLocationId(data[0].id);
+      });
+  }, []);
 
   // Step 2
   const [competitorUrl, setCompetitorUrl] = useState('');
@@ -82,12 +95,17 @@ function ArticleTool() {
     setLoadingTopics(true);
     setTopicSuggestions([]);
     try {
-      const { data: queries } = await supabase
+      let queryBuilder = supabase
         .from('site_queries')
         .select('query')
         .order('created_at', { ascending: false })
         .limit(50);
 
+      if (suggestLocationId) {
+        queryBuilder = queryBuilder.eq('location_id', suggestLocationId);
+      }
+
+      const { data: queries } = await queryBuilder;
       const uniqueQueries = [...new Set((queries || []).map((q) => q.query))];
 
       const res = await fetch('/api/article/suggest-topics', {
@@ -241,18 +259,40 @@ function ArticleTool() {
             <div className="bg-surface border border-border rounded-2xl card-shadow p-6">
               <div className="flex items-center justify-between mb-1 flex-wrap gap-2">
                 <h2 className="font-display font-semibold">Argomenti suggeriti</h2>
-                <button
-                  onClick={handleSuggestTopics}
-                  disabled={loadingTopics}
-                  className="text-xs font-mono text-muted hover:text-ink border border-border rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
-                >
-                  {loadingTopics ? 'suggerisco...' : topicSuggestions.length ? 'rigenera' : 'suggerisci 3 argomenti'}
-                </button>
+                <div className="flex items-center gap-2">
+                  {locations.length > 0 && (
+                    <select
+                      value={suggestLocationId}
+                      onChange={(e) => setSuggestLocationId(e.target.value)}
+                      className="bg-bg border border-border rounded-lg px-2 py-1.5 text-xs text-ink outline-none focus:border-accent"
+                    >
+                      {locations.map((l) => (
+                        <option key={l.id} value={l.id}>
+                          {l.name}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                  <button
+                    onClick={handleSuggestTopics}
+                    disabled={loadingTopics}
+                    className="text-xs font-mono text-muted hover:text-ink border border-border rounded-lg px-3 py-1.5 transition-colors disabled:opacity-50"
+                  >
+                    {loadingTopics ? 'suggerisco...' : topicSuggestions.length ? 'rigenera' : 'suggerisci 3 argomenti'}
+                  </button>
+                </div>
               </div>
               <p className="text-muted text-sm mb-4">
-                Basati sulle query di ricerca reali del tuo sito (le stesse del modulo Social
-                Post). Se non ti convincono, ignora pure e scegli tu keyword e URL nello Step 2.
+                Basati sulle query di ricerca reali della sede scelta (le stesse del modulo
+                Social Post). Se non ti convincono, ignora pure e scegli tu keyword e URL nello
+                Step 2.
               </p>
+              {locations.length === 0 && (
+                <p className="text-muted text-xs font-mono mb-4">
+                  nessuna sede configurata ancora — aggiungine una dal modulo Social Post per
+                  usare query reali, oppure procedi comunque con argomenti generici.
+                </p>
+              )}
 
               {loadingTopics && (
                 <p className="font-mono text-xs text-muted">analisi delle query in corso...</p>
